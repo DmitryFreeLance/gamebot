@@ -12,9 +12,14 @@ public class KeyboardFactory {
     public InlineKeyboardMarkup smartLayout(List<InlineKeyboardButton> buttons) {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         List<InlineKeyboardButton> pair = new ArrayList<>(2);
+        InlineKeyboardButton menuButton = null;
 
         for (InlineKeyboardButton button : buttons) {
             if (button == null) {
+                continue;
+            }
+            if (isMenu(button)) {
+                menuButton = button;
                 continue;
             }
             if (isShort(button.getText())) {
@@ -35,7 +40,37 @@ public class KeyboardFactory {
         if (!pair.isEmpty()) {
             rows.add(new ArrayList<>(pair));
         }
+        if (menuButton != null) {
+            rows.add(List.of(menuButton));
+        }
 
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    public InlineKeyboardMarkup verticalLayout(List<InlineKeyboardButton> buttons) {
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        InlineKeyboardButton menuButton = null;
+        for (InlineKeyboardButton button : buttons) {
+            if (button == null) {
+                continue;
+            }
+            if (isMenu(button)) {
+                menuButton = button;
+                continue;
+            }
+            rows.add(List.of(button));
+        }
+        if (menuButton != null) {
+            rows.add(List.of(menuButton));
+        }
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    public InlineKeyboardMarkup rowsLayout(List<List<InlineKeyboardButton>> rows) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         markup.setKeyboard(rows);
         return markup;
@@ -50,5 +85,9 @@ public class KeyboardFactory {
 
     private boolean isShort(String text) {
         return text != null && text.length() < 14;
+    }
+
+    private boolean isMenu(InlineKeyboardButton button) {
+        return "🏠 Меню".equals(button.getText());
     }
 }

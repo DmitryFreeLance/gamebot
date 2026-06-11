@@ -13,6 +13,7 @@ public class UserSession {
     private Long questId;
     private Long rewardId;
     private Long submissionId;
+    private Long supportTicketId;
     private final Map<String, String> data = new HashMap<>();
 
     public void reset() {
@@ -20,6 +21,7 @@ public class UserSession {
         questId = null;
         rewardId = null;
         submissionId = null;
+        supportTicketId = null;
         data.clear();
     }
 }
