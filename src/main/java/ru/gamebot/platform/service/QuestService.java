@@ -77,7 +77,7 @@ public class QuestService {
     }
 
     public QuestSubmission getSubmission(Long submissionId) {
-        return questSubmissionRepository.findById(submissionId)
+        return questSubmissionRepository.findWithUserAndQuestById(submissionId)
                 .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена."));
     }
 

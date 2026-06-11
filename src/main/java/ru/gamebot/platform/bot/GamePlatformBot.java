@@ -592,7 +592,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         List<InlineKeyboardButton> buttons = new ArrayList<>();
         buttons.add(keyboardFactory.callback("🚀 Взять", "quest:take:" + questId));
         buttons.add(keyboardFactory.callback("📤 Отчёт", "quest:report:" + questId));
-        buttons.add(keyboardFactory.callback("🗂️ Квесты", "menu:quests"));
+        buttons.add(keyboardFactory.callback("⬅️ Назад", "menu:quests"));
         if (adminService.isAdmin(user.getTelegramId())) {
             buttons.add(keyboardFactory.callback("✏️ Правка", "admin:quest:" + questId));
         }
