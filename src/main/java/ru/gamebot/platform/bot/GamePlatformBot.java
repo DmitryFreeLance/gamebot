@@ -146,15 +146,21 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             return;
         }
 
-        if ("/menu".equalsIgnoreCase(text)) {
-            sendMainMenu(user, "🏠 Главное меню готово. Выбирайте раздел ниже.");
+        if (!user.isRegistrationCompleted()) {
+            if ("/menu".equalsIgnoreCase(text)) {
+                sendCurrentRegistrationStep(user, session,
+                        "🧭 Сначала завершим регистрацию. После этого откроется полное меню платформы.");
+                return;
+            }
+            sendText(user.getTelegramId(),
+                    "🧭 Сначала завершим регистрацию. Ответьте на текущий шаг, и я сразу переведу вас дальше.",
+                    null);
+            sendCurrentRegistrationStep(user, session, null);
             return;
         }
 
-        if (!user.isRegistrationCompleted()) {
-            sendText(user.getTelegramId(),
-                    "🧭 Сначала завершим регистрацию. Напишите ответ на текущий шаг или нажмите отмену.",
-                    cancelKeyboard());
+        if ("/menu".equalsIgnoreCase(text)) {
+            sendMainMenu(user, "🏠 Главное меню готово. Выбирайте раздел ниже.");
             return;
         }
 
@@ -202,6 +208,12 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             handleInterestSelection(callbackQuery, user, session, data.substring("reg:interest:".length()));
             return;
         }
+        if ("common:cancel".equals(data) && !user.isRegistrationCompleted()) {
+            answer(callbackQuery.getId(), "Во время регистрации отмена недоступна");
+            sendCurrentRegistrationStep(user, session,
+                    "🔒 Во время регистрации нельзя выйти из сценария. Давайте просто завершим профиль.");
+            return;
+        }
         if ("common:cancel".equals(data)) {
             session.reset();
             sendMainMenu(user, "↩️ Текущее действие отменено. Возвращаю вас в главное меню.");
@@ -211,9 +223,8 @@ public class GamePlatformBot extends TelegramLongPollingBot {
 
         if (!user.isRegistrationCompleted()) {
             answer(callbackQuery.getId(), "Сначала завершим регистрацию");
-            sendText(user.getTelegramId(),
-                    "🧭 Перед использованием разделов нужно закончить регистрацию. Продолжим с текущего шага.",
-                    cancelKeyboard());
+            sendCurrentRegistrationStep(user, session,
+                    "🧭 Перед использованием разделов нужно закончить регистрацию. Продолжим с текущего шага.");
             return;
         }
 
@@ -349,21 +360,21 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                 session.setState(SessionState.REG_AGE);
                 sendText(user.getTelegramId(),
                         "🧾 Отлично, <b>" + escape(text.trim()) + "</b>!\n\nТеперь укажите возраст числом.",
-                        cancelKeyboard());
+                        null);
             }
             case REG_AGE -> {
                 Integer age = parseInteger(text.trim());
                 if (age == null || age < 10 || age > 99) {
                     sendText(user.getTelegramId(),
                             "⚠️ Возраст должен быть числом в диапазоне 10-99. Попробуйте ещё раз.",
-                            cancelKeyboard());
+                            null);
                     return;
                 }
                 session.getData().put("age", age.toString());
                 session.setState(SessionState.REG_COUNTRY);
                 sendText(user.getTelegramId(),
                         "🌍 Отлично. Теперь напишите страну, из которой вы играете.",
-                        cancelKeyboard());
+                        null);
             }
             case REG_COUNTRY -> {
                 session.getData().put("country", text.trim());
@@ -445,7 +456,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         sendText(user.getTelegramId(),
                 "🎯 Выберите платформы, на которых вам интересны задания.\n\n"
                         + "Сейчас выбрано: <b>" + escape(selected.isEmpty() ? "ничего" : String.join(", ", selected)) + "</b>",
-                selectionKeyboard(PLATFORM_OPTIONS, selected, "reg:platform:", true, false));
+                selectionKeyboard(PLATFORM_OPTIONS, selected, "reg:platform:", true, false, false));
     }
 
     private void sendInterestQuestion(AppUser user, UserSession session) {
@@ -453,7 +464,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         sendText(user.getTelegramId(),
                 "🧠 Выберите игровые интересы. Этот шаг можно пропустить.\n\n"
                         + "Сейчас выбрано: <b>" + escape(selected.isEmpty() ? "ничего" : String.join(", ", selected)) + "</b>",
-                selectionKeyboard(INTEREST_OPTIONS, selected, "reg:interest:", true, true));
+                selectionKeyboard(INTEREST_OPTIONS, selected, "reg:interest:", true, true, false));
     }
 
     private void finishRegistration(AppUser user, UserSession session, List<String> interests) {
@@ -1218,7 +1229,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
     }
 
     private InlineKeyboardMarkup selectionKeyboard(Map<String, String> options, List<String> selected,
-                                                   String prefix, boolean withDone, boolean withSkip) {
+                                                   String prefix, boolean withDone, boolean withSkip, boolean withCancel) {
         List<InlineKeyboardButton> buttons = new ArrayList<>();
         for (Map.Entry<String, String> entry : options.entrySet()) {
             boolean isSelected = selected.contains(entry.getValue());
@@ -1231,8 +1242,39 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         if (withSkip) {
             buttons.add(keyboardFactory.callback("⏭️ Пропустить", prefix + "skip"));
         }
-        buttons.add(keyboardFactory.callback("❌ Отмена", "common:cancel"));
+        if (withCancel) {
+            buttons.add(keyboardFactory.callback("❌ Отмена", "common:cancel"));
+        }
         return keyboardFactory.smartLayout(buttons);
+    }
+
+    private void sendCurrentRegistrationStep(AppUser user, UserSession session, String intro) {
+        if (intro != null && !intro.isBlank()) {
+            sendText(user.getTelegramId(), intro, null);
+        }
+
+        SessionState state = session.getState();
+        if (state == SessionState.NONE) {
+            session.setState(SessionState.REG_NAME);
+            state = SessionState.REG_NAME;
+        }
+
+        switch (state) {
+            case REG_NAME -> sendText(user.getTelegramId(),
+                    "🎮 Напишите ваш игровой никнейм, чтобы я создал профиль игрока.",
+                    null);
+            case REG_AGE -> sendText(user.getTelegramId(),
+                    "🧾 Укажите возраст числом. Это нужно для корректной сегментации заданий.",
+                    null);
+            case REG_COUNTRY -> sendText(user.getTelegramId(),
+                    "🌍 Напишите страну, из которой вы играете.",
+                    null);
+            case REG_PLATFORMS -> sendPlatformQuestion(user, session);
+            case REG_INTERESTS -> sendInterestQuestion(user, session);
+            default -> sendText(user.getTelegramId(),
+                    "🧭 Продолжим заполнение профиля с текущего шага.",
+                    null);
+        }
     }
 
     private void sendText(Long chatId, String text, InlineKeyboardMarkup keyboard) {
