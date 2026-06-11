@@ -554,6 +554,10 @@ public class GamePlatformBot extends TelegramLongPollingBot {
     }
 
     private void sendMainMenu(AppUser user, String text) {
+        if (ROLE_MODER.equals(resolveMenuRole(user, sessionService.get(user.getTelegramId())))) {
+            sendModerationHub(user);
+            return;
+        }
         sendText(user.getTelegramId(), text, mainMenuKeyboard(user));
     }
 
@@ -953,10 +957,11 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                         + "📂 Отчёты по квестам: <b>" + questService.pendingCount() + "</b>\n"
                         + "🆘 Открытые заявки поддержки: <b>" + supportService.activeTicketCount() + "</b>\n\n"
                         + "Здесь собрана вся оперативная работа по платформе.",
-                keyboardFactory.verticalLayout(List.of(
+                keyboardFactory.rowsLayout(List.of(
+                        List.of(
                         keyboardFactory.callback("📂 Квесты", "mod:support:quests"),
-                        keyboardFactory.callback("🆘 Поддержка", "mod:support:list"),
-                        keyboardFactory.callback("🏠 Меню", "menu:main")
+                        keyboardFactory.callback("🆘 Поддержка", "mod:support:list")
+                        )
                 )));
     }
 
@@ -1858,14 +1863,12 @@ public class GamePlatformBot extends TelegramLongPollingBot {
     private String mainMenuText(AppUser user) {
         String role = resolveMenuRole(user, sessionService.get(user.getTelegramId()));
         String title = switch (role) {
-            case ROLE_ADMIN -> "🛠️ <b>Пульт администратора</b>";
+            case ROLE_ADMIN -> "🛠️ <b>Административный контур активен</b>";
             case ROLE_MODER -> "🛡️ <b>Пульт модератора</b>";
             default -> "🏠 <b>Главное меню</b>";
         };
         String body = switch (role) {
-            case ROLE_ADMIN -> "Перед вами главный центр управления <b>" + escape(appProperties.getClubName()) + "</b>.\n"
-                    + "Из этого раздела вы можете работать с пользователями и ролями, вести квестовый контент, запускать рассылки, выдавать бонусы и контролировать ключевые показатели платформы.\n\n"
-                    + "Выберите нужный блок ниже и переходите к работе.";
+            case ROLE_ADMIN -> "С возвращением, <b>" + escape(user.getNickname()) + "</b>.";
             case ROLE_MODER -> "Перед вами рабочий контур модерации <b>" + escape(appProperties.getClubName()) + "</b>.\n"
                     + "Здесь собраны очереди проверки квестов и обращения пользователей, чтобы вы могли быстро поддерживать качество сервиса и темп обработки заявок.\n\n"
                     + "Откройте нужную очередь и продолжайте работу.";
@@ -1873,6 +1876,9 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                     + "Здесь вы можете брать задания, накапливать XP, подниматься в рейтинге, приглашать друзей и обменивать монеты на награды.\n\n"
                     + "Выберите нужный раздел ниже и продолжайте прогресс.";
         };
+        if (ROLE_ADMIN.equals(role)) {
+            return title + "\n\n" + body;
+        }
         return title + "\n\n"
                 + "Здравствуйте, <b>" + escape(user.getNickname()) + "</b>.\n"
                 + "Активный режим: <b>" + escape(humanRole(role)) + "</b>.\n\n"
@@ -2047,6 +2053,9 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             case ROLE_MODER -> "🛡️ <b>Контур модерации активен</b>";
             default -> "🏠 <b>Платформа готова к игре</b>";
         };
+        if (ROLE_ADMIN.equals(resolveMenuRole(user, sessionService.get(user.getTelegramId())))) {
+            return title + "\n\nС возвращением, <b>" + escape(user.getNickname()) + "</b>.";
+        }
         String activity = streakMessage == null
                 ? "Все ключевые разделы уже готовы к работе."
                 : escape(streakMessage);
