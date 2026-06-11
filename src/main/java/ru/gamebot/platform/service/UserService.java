@@ -3,6 +3,7 @@ package ru.gamebot.platform.service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -38,6 +39,7 @@ public class UserService {
         user.setCompletedQuests(0);
         user.setInvitedFriends(0);
         user.setStreakDays(0);
+        user.setStaffRole("USER");
         user.setCreatedAt(LocalDateTime.now());
         updateTelegramProfile(user, telegramUser);
         return appUserRepository.save(user);
@@ -213,6 +215,21 @@ public class UserService {
         return appUserRepository.findAll().stream()
                 .filter(AppUser::isRegistrationCompleted)
                 .collect(Collectors.toList());
+    }
+
+    public List<AppUser> allUsersSorted() {
+        return appUserRepository.findAll().stream()
+                .sorted(Comparator.comparing(AppUser::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(AppUser::getTelegramId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public AppUser updateStaffRole(Long telegramId, String staffRole) {
+        AppUser user = appUserRepository.findByTelegramId(telegramId)
+                .orElseThrow(() -> new IllegalArgumentException("Игрок с таким Telegram ID не найден."));
+        user.setStaffRole(staffRole);
+        return appUserRepository.save(user);
     }
 
     private Long resolveReferral(Long currentTelegramId, Long referredByTelegramId) {

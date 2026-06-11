@@ -28,6 +28,7 @@ public class AppUser {
     private String telegramFirstName;
     private String telegramLastName;
     private String nickname;
+    private String staffRole;
     private Integer age;
     private String country;
 

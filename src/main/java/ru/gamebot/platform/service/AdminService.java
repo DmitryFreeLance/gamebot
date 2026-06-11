@@ -3,22 +3,60 @@ package ru.gamebot.platform.service;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.gamebot.platform.config.AppProperties;
+import ru.gamebot.platform.domain.model.AppUser;
+import ru.gamebot.platform.domain.repository.AppUserRepository;
 
 @Service
 @RequiredArgsConstructor
 public class AdminService {
 
     private final AppProperties appProperties;
+    private final AppUserRepository appUserRepository;
 
     public boolean isAdmin(Long telegramId) {
-        return resolvedAdminIds().contains(telegramId);
+        return resolvedAdminIds().contains(telegramId)
+                || appUserRepository.findByTelegramId(telegramId)
+                .map(user -> "ADMIN".equalsIgnoreCase(user.getStaffRole()))
+                .orElse(false);
     }
 
     public boolean isModerator(Long telegramId) {
-        return isAdmin(telegramId) || resolvedModeratorIds().contains(telegramId);
+        return isAdmin(telegramId)
+                || resolvedModeratorIds().contains(telegramId)
+                || appUserRepository.findByTelegramId(telegramId)
+                .map(user -> "MODER".equalsIgnoreCase(user.getStaffRole()))
+                .orElse(false);
+    }
+
+    public String configuredRole(Long telegramId) {
+        if (resolvedAdminIds().contains(telegramId)) {
+            return "ADMIN";
+        }
+        if (resolvedModeratorIds().contains(telegramId)) {
+            return "MODER";
+        }
+        return "USER";
+    }
+
+    public String effectiveRole(AppUser user) {
+        String configured = configuredRole(user.getTelegramId());
+        if ("ADMIN".equals(configured)) {
+            return "ADMIN";
+        }
+        if ("MODER".equals(configured)) {
+            return "MODER";
+        }
+        if ("ADMIN".equalsIgnoreCase(user.getStaffRole())) {
+            return "ADMIN";
+        }
+        if ("MODER".equalsIgnoreCase(user.getStaffRole())) {
+            return "MODER";
+        }
+        return "USER";
     }
 
     public Set<Long> resolvedAdminIds() {
@@ -31,6 +69,25 @@ public class AdminService {
     public Set<Long> resolvedModeratorIds() {
         Set<Long> ids = new HashSet<>(appProperties.getModeratorIds());
         ids.addAll(parseIds(appProperties.getModeratorIdsRaw()));
+        return ids;
+    }
+
+    public Set<Long> allAdminIds() {
+        Set<Long> ids = new HashSet<>(resolvedAdminIds());
+        ids.addAll(appUserRepository.findAll().stream()
+                .filter(user -> "ADMIN".equalsIgnoreCase(user.getStaffRole()))
+                .map(AppUser::getTelegramId)
+                .collect(Collectors.toSet()));
+        return ids;
+    }
+
+    public Set<Long> allModeratorIds() {
+        Set<Long> ids = new HashSet<>(resolvedModeratorIds());
+        ids.addAll(appUserRepository.findAll().stream()
+                .filter(user -> "ADMIN".equalsIgnoreCase(user.getStaffRole()) || "MODER".equalsIgnoreCase(user.getStaffRole()))
+                .map(AppUser::getTelegramId)
+                .collect(Collectors.toSet()));
+        ids.addAll(allAdminIds());
         return ids;
     }
 
