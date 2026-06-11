@@ -8,13 +8,14 @@ RUN mvn -q -DskipTests package
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/game-platform-bot-1.0.0.jar app.jar
-ENV BOT_TOKEN=""
-ENV BOT_USERNAME=""
+ENV TELEGRAM_BOT_TOKEN=""
+ENV TELEGRAM_BOT_USERNAME=""
+ENV INITIAL_ADMIN_ID=""
 ENV APP_ADMIN_IDS=""
 ENV APP_MODERATOR_IDS=""
 ENV APP_SUPPORT_USERNAME="support_manager"
 ENV APP_CLUB_NAME="Game Quest Club"
-ENV SPRING_DATASOURCE_URL="jdbc:h2:file:/app/data/gamebot;AUTO_SERVER=TRUE"
-EXPOSE 8080
-VOLUME ["/app/data"]
+ENV DB_PATH="/data/game-platform-bot"
+ENV JAVA_TOOL_OPTIONS="-Djava.net.preferIPv4Stack=true -Djava.net.preferIPv6Addresses=false"
+VOLUME ["/data"]
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

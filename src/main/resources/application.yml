@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:h2:file:./data/gamebot;AUTO_SERVER=TRUE}
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:file:${DB_PATH:/data/game-platform-bot};AUTO_SERVER=TRUE}
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -18,7 +18,7 @@ spring:
 app:
   club-name: ${APP_CLUB_NAME:Game Quest Club}
   support-username: ${APP_SUPPORT_USERNAME:support_manager}
-  admin-ids: ${APP_ADMIN_IDS:}
+  admin-ids: ${APP_ADMIN_IDS:${INITIAL_ADMIN_ID:}}
   moderator-ids: ${APP_MODERATOR_IDS:}
-  bot-token: ${BOT_TOKEN:}
-  bot-username: ${BOT_USERNAME:}
+  bot-token: ${TELEGRAM_BOT_TOKEN:${BOT_TOKEN:}}
+  bot-username: ${TELEGRAM_BOT_USERNAME:${BOT_USERNAME:}}
