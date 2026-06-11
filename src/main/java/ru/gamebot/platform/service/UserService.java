@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -93,14 +94,14 @@ public class UserService {
     }
 
     public List<String> getAchievements(AppUser user) {
-        return List.of(
+        return Stream.of(
                 user.getCompletedQuests() >= 1 ? "🏅 Первое задание" : null,
                 user.getCompletedQuests() >= 10 ? "🔥 10 заданий" : null,
                 user.getCompletedQuests() >= 100 ? "👑 100 заданий" : null,
                 user.getInvitedFriends() >= 1 ? "🤝 Первый реферал" : null,
                 user.getInvitedFriends() >= 10 ? "🚀 10 рефералов" : null,
                 user.getXp() >= 6000 ? "🌟 Легенда клуба" : null
-        ).stream().filter(item -> item != null).toList();
+        ).filter(item -> item != null).toList();
     }
 
     @Transactional

@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
@@ -321,13 +322,18 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                 return;
             }
             session.setState(SessionState.REG_INTERESTS);
-            sendInterestQuestion(user, session);
+            editRegistrationSelectionMessage(
+                    callbackQuery,
+                    "🧠 Выберите игровые интересы. Этот шаг можно пропустить.\n\n"
+                            + "Сейчас выбрано: <b>ничего</b>",
+                    selectionKeyboard(INTEREST_OPTIONS, List.of(), "reg:interest:", true, true, false)
+            );
             answer(callbackQuery.getId(), "Платформы сохранены");
             return;
         }
 
         toggleSelection(session, "platforms", action);
-        sendPlatformQuestion(user, session);
+        editPlatformQuestion(callbackQuery, session);
         answer(callbackQuery.getId(), "Выбор обновлен");
     }
 
@@ -349,7 +355,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         }
 
         toggleSelection(session, "interests", action);
-        sendInterestQuestion(user, session);
+        editInterestQuestion(callbackQuery, session);
         answer(callbackQuery.getId(), "Выбор обновлен");
     }
 
@@ -453,17 +459,13 @@ public class GamePlatformBot extends TelegramLongPollingBot {
 
     private void sendPlatformQuestion(AppUser user, UserSession session) {
         List<String> selected = resolveSelections(session, "platforms", PLATFORM_OPTIONS);
-        sendText(user.getTelegramId(),
-                "🎯 Выберите платформы, на которых вам интересны задания.\n\n"
-                        + "Сейчас выбрано: <b>" + escape(selected.isEmpty() ? "ничего" : String.join(", ", selected)) + "</b>",
+        sendText(user.getTelegramId(), platformQuestionText(selected),
                 selectionKeyboard(PLATFORM_OPTIONS, selected, "reg:platform:", true, false, false));
     }
 
     private void sendInterestQuestion(AppUser user, UserSession session) {
         List<String> selected = resolveSelections(session, "interests", INTEREST_OPTIONS);
-        sendText(user.getTelegramId(),
-                "🧠 Выберите игровые интересы. Этот шаг можно пропустить.\n\n"
-                        + "Сейчас выбрано: <b>" + escape(selected.isEmpty() ? "ничего" : String.join(", ", selected)) + "</b>",
+        sendText(user.getTelegramId(), interestQuestionText(selected),
                 selectionKeyboard(INTEREST_OPTIONS, selected, "reg:interest:", true, true, false));
     }
 
@@ -1248,6 +1250,34 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         return keyboardFactory.smartLayout(buttons);
     }
 
+    private void editPlatformQuestion(CallbackQuery callbackQuery, UserSession session) {
+        List<String> selected = resolveSelections(session, "platforms", PLATFORM_OPTIONS);
+        editRegistrationSelectionMessage(
+                callbackQuery,
+                platformQuestionText(selected),
+                selectionKeyboard(PLATFORM_OPTIONS, selected, "reg:platform:", true, false, false)
+        );
+    }
+
+    private void editInterestQuestion(CallbackQuery callbackQuery, UserSession session) {
+        List<String> selected = resolveSelections(session, "interests", INTEREST_OPTIONS);
+        editRegistrationSelectionMessage(
+                callbackQuery,
+                interestQuestionText(selected),
+                selectionKeyboard(INTEREST_OPTIONS, selected, "reg:interest:", true, true, false)
+        );
+    }
+
+    private String platformQuestionText(List<String> selected) {
+        return "🎯 Выберите платформы, на которых вам интересны задания.\n\n"
+                + "Сейчас выбрано: <b>" + escape(selected.isEmpty() ? "ничего" : String.join(", ", selected)) + "</b>";
+    }
+
+    private String interestQuestionText(List<String> selected) {
+        return "🧠 Выберите игровые интересы. Этот шаг можно пропустить.\n\n"
+                + "Сейчас выбрано: <b>" + escape(selected.isEmpty() ? "ничего" : String.join(", ", selected)) + "</b>";
+    }
+
     private void sendCurrentRegistrationStep(AppUser user, UserSession session, String intro) {
         if (intro != null && !intro.isBlank()) {
             sendText(user.getTelegramId(), intro, null);
@@ -1323,6 +1353,23 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             execute(editMessageReplyMarkup);
         } catch (TelegramApiException exception) {
             log.warn("Failed to clear inline keyboard for stale callback {}", callbackQuery.getId(), exception);
+        }
+    }
+
+    private void editRegistrationSelectionMessage(CallbackQuery callbackQuery, String text, InlineKeyboardMarkup keyboard) {
+        if (callbackQuery.getMessage() == null) {
+            return;
+        }
+        EditMessageText editMessageText = new EditMessageText();
+        editMessageText.setChatId(callbackQuery.getMessage().getChatId().toString());
+        editMessageText.setMessageId(callbackQuery.getMessage().getMessageId());
+        editMessageText.setText(text);
+        editMessageText.setParseMode("HTML");
+        editMessageText.setReplyMarkup(keyboard);
+        try {
+            execute(editMessageText);
+        } catch (TelegramApiException exception) {
+            log.warn("Failed to edit registration selection message {}", callbackQuery.getId(), exception);
         }
     }
 
