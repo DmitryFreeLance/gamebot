@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
 import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
@@ -132,7 +133,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                     "🎉 Добро пожаловать в <b>" + escape(appProperties.getClubName()) + "</b>!\n\n"
                             + "Чтобы открыть квесты, рейтинг и награды, давайте быстро оформим профиль.\n"
                             + "Напишите ваш игровой никнейм.",
-                    cancelKeyboard());
+                    null);
             return;
         }
 
@@ -180,7 +181,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                     "🎮 Добро пожаловать в <b>" + escape(appProperties.getClubName()) + "</b>!\n\n"
                             + "Здесь вас ждут квесты, XP, рейтинг, награды и реферальная программа.\n"
                             + "Начнем с профиля. Напишите ваш игровой никнейм.",
-                    cancelKeyboard());
+                    null);
             return;
         }
 
@@ -209,9 +210,8 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             return;
         }
         if ("common:cancel".equals(data) && !user.isRegistrationCompleted()) {
-            answer(callbackQuery.getId(), "Во время регистрации отмена недоступна");
-            sendCurrentRegistrationStep(user, session,
-                    "🔒 Во время регистрации нельзя выйти из сценария. Давайте просто завершим профиль.");
+            clearInlineKeyboard(callbackQuery);
+            answerSilently(callbackQuery.getId());
             return;
         }
         if ("common:cancel".equals(data)) {
@@ -1298,6 +1298,31 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             execute(answer);
         } catch (TelegramApiException exception) {
             log.warn("Failed to answer callback {}", callbackId, exception);
+        }
+    }
+
+    private void answerSilently(String callbackId) {
+        AnswerCallbackQuery answer = new AnswerCallbackQuery();
+        answer.setCallbackQueryId(callbackId);
+        try {
+            execute(answer);
+        } catch (TelegramApiException exception) {
+            log.warn("Failed to answer callback silently {}", callbackId, exception);
+        }
+    }
+
+    private void clearInlineKeyboard(CallbackQuery callbackQuery) {
+        if (callbackQuery.getMessage() == null) {
+            return;
+        }
+        EditMessageReplyMarkup editMessageReplyMarkup = new EditMessageReplyMarkup();
+        editMessageReplyMarkup.setChatId(callbackQuery.getMessage().getChatId().toString());
+        editMessageReplyMarkup.setMessageId(callbackQuery.getMessage().getMessageId());
+        editMessageReplyMarkup.setReplyMarkup(null);
+        try {
+            execute(editMessageReplyMarkup);
+        } catch (TelegramApiException exception) {
+            log.warn("Failed to clear inline keyboard for stale callback {}", callbackQuery.getId(), exception);
         }
     }
 
