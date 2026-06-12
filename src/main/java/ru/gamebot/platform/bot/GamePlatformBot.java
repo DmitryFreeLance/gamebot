@@ -155,6 +155,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             sendText(user.getTelegramId(),
                     "🎉 Добро пожаловать в <b>" + escape(appProperties.getClubName()) + "</b>!\n\n"
                             + "Чтобы открыть квесты, рейтинг и награды, давайте быстро оформим профиль.\n"
+                            + "<b>ВАЖНО! Ник в боте должен совпадать с ником в игре</b>\n\n"
                             + "Напишите ваш игровой никнейм.",
                     null);
             return;
@@ -214,6 +215,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             sendText(user.getTelegramId(),
                     "🎮 Добро пожаловать в <b>" + escape(appProperties.getClubName()) + "</b>!\n\n"
                             + "Здесь вас ждут квесты, XP, рейтинг, награды и реферальная программа.\n"
+                            + "<b>ВАЖНО! Ник в боте должен совпадать с ником в игре</b>\n\n"
                             + "Начнем с профиля. Напишите ваш игровой никнейм.",
                     null);
             return;
