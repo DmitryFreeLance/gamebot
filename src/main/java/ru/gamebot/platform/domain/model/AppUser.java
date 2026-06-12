@@ -42,6 +42,7 @@ public class AppUser {
     private long xp;
     private long weeklyXp;
     private long coins;
+    private long tickets;
     private int completedQuests;
     private int invitedFriends;
     private int streakDays;

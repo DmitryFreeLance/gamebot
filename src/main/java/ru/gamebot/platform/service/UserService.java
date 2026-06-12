@@ -36,6 +36,7 @@ public class UserService {
         user.setXp(0);
         user.setWeeklyXp(0);
         user.setCoins(0);
+        user.setTickets(0);
         user.setCompletedQuests(0);
         user.setInvitedFriends(0);
         user.setStreakDays(0);
@@ -187,17 +188,23 @@ public class UserService {
 
     @Transactional
     public void addReward(AppUser user, long xp, long coins) {
+        addReward(user, xp, coins, 0);
+    }
+
+    @Transactional
+    public void addReward(AppUser user, long xp, long coins, long tickets) {
         user.setXp(user.getXp() + xp);
         user.setWeeklyXp(user.getWeeklyXp() + xp);
         user.setCoins(user.getCoins() + coins);
+        user.setTickets(user.getTickets() + tickets);
         appUserRepository.save(user);
     }
 
     @Transactional
-    public void addManualBonus(Long telegramId, long xp, long coins) {
+    public void addManualBonus(Long telegramId, long xp, long coins, long tickets) {
         AppUser user = appUserRepository.findByTelegramId(telegramId)
                 .orElseThrow(() -> new IllegalArgumentException("Игрок с таким Telegram ID не найден."));
-        addReward(user, xp, coins);
+        addReward(user, xp, coins, tickets);
     }
 
     @Transactional

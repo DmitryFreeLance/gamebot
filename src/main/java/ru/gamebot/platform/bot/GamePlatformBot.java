@@ -65,18 +65,18 @@ public class GamePlatformBot extends TelegramLongPollingBot {
     private static final Map<String, String> INTEREST_OPTIONS = new LinkedHashMap<>();
 
     static {
-        PLATFORM_OPTIONS.put("ANDROID", "📱 Android");
-        PLATFORM_OPTIONS.put("IPHONE", "🍎 iPhone");
-        PLATFORM_OPTIONS.put("PC", "🖥️ PC");
-        PLATFORM_OPTIONS.put("PS5", "🎮 PS5");
-        PLATFORM_OPTIONS.put("XBOX", "🕹️ Xbox");
+        PLATFORM_OPTIONS.put("ANDROID", "Android");
+        PLATFORM_OPTIONS.put("IPHONE", "iPhone");
+        PLATFORM_OPTIONS.put("PC", "PC");
+        PLATFORM_OPTIONS.put("PS5", "PS5");
+        PLATFORM_OPTIONS.put("XBOX", "Xbox");
 
-        INTEREST_OPTIONS.put("FPS", "🔫 FPS");
-        INTEREST_OPTIONS.put("MMO", "🌍 MMO");
-        INTEREST_OPTIONS.put("RPG", "🧙 RPG");
-        INTEREST_OPTIONS.put("STRATEGY", "♟️ Стратегии");
-        INTEREST_OPTIONS.put("SPORT", "⚽ Спорт");
-        INTEREST_OPTIONS.put("CASUAL", "🎉 Казуальные");
+        INTEREST_OPTIONS.put("FPS", "FPS");
+        INTEREST_OPTIONS.put("MMO", "MMO");
+        INTEREST_OPTIONS.put("RPG", "RPG");
+        INTEREST_OPTIONS.put("STRATEGY", "Стратегии");
+        INTEREST_OPTIONS.put("SPORT", "Спорт");
+        INTEREST_OPTIONS.put("CASUAL", "Казуальные");
     }
 
     private final AppProperties appProperties;
@@ -575,6 +575,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                         + "🏆 <b>Текущая форма</b>\n"
                         + "✨ XP: <b>" + user.getXp() + "</b>\n"
                         + "🪙 Монеты: <b>" + user.getCoins() + "</b>\n"
+                        + "🎟️ Билеты: <b>" + user.getTickets() + "</b>\n"
                         + "🥇 Место в рейтинге: <b>" + rank + "</b>\n"
                         + "✅ Выполнено квестов: <b>" + user.getCompletedQuests() + "</b>\n"
                         + "🔥 Серия входов: <b>" + user.getStreakDays() + " дней</b>\n\n"
@@ -605,6 +606,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         sendText(user.getTelegramId(),
                 "💰 <b>Баланс</b>\n\n"
                         + "🪙 Монеты клуба: <b>" + user.getCoins() + "</b>\n"
+                        + "🎟️ Билеты сезона: <b>" + user.getTickets() + "</b>\n"
                         + "✨ Общий XP: <b>" + user.getXp() + "</b>\n"
                         + "📈 XP за неделю: <b>" + user.getWeeklyXp() + "</b>\n\n"
                         + "Чем активнее вы играете, тем быстрее открываете сильные награды и поднимаетесь в рейтинге.",
@@ -1367,6 +1369,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                         + "🟢 Активных за 7 дней: <b>" + activeUsers + "</b>\n"
                         + "🆕 Новых игроков: <b>" + users.stream().filter(player -> player.getCreatedAt().toLocalDate().equals(java.time.LocalDate.now())).count() + "</b>\n"
                         + "✅ Выполненных заданий: <b>" + users.stream().mapToInt(AppUser::getCompletedQuests).sum() + "</b>\n"
+                        + "🎟️ Билетов в обороте: <b>" + users.stream().mapToLong(AppUser::getTickets).sum() + "</b>\n"
                         + "💸 Потенциальные расходы на выплаты: <b>" + totalQuestExpenses + " монет</b>\n"
                         + "📥 Заявок на модерации: <b>" + questService.pendingCount() + "</b>",
                 keyboardFactory.smartLayout(List.of(
@@ -1521,8 +1524,8 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         }
         builder.append("🎁 <b>Начисление бонуса</b>\n\n")
                 .append("Выберите игрока по номеру из списка ниже и отправьте данные одним сообщением.\n")
-                .append("Формат: <code>НОМЕР XP COINS комментарий</code>\n")
-                .append("Пример: <code>").append(from + 1).append(" 100 50 За активность</code>\n\n")
+                .append("Формат: <code>НОМЕР XP COINS TICKETS комментарий</code>\n")
+                .append("Пример: <code>").append(from + 1).append(" 100 50 3 За активность</code>\n\n")
                 .append("Страница <b>").append(page + 1).append(" / ").append(totalPages).append("</b>\n\n");
 
         for (int i = 0; i < pageItems.size(); i++) {
@@ -1552,26 +1555,32 @@ public class GamePlatformBot extends TelegramLongPollingBot {
     }
 
     private void handleBonusInput(AppUser user, UserSession session, String text) {
-        String[] parts = text.trim().split("\\s+", 4);
-        if (parts.length < 3) {
+        String[] parts = text.trim().split("\\s+", 5);
+        if (parts.length < 4) {
             sendAdminBonusUsersPage(user, session, currentBonusPage(session),
-                    "⚠️ Формат неверный. Используйте: <code>НОМЕР XP COINS комментарий</code>.");
+                    "⚠️ Формат неверный. Используйте: <code>НОМЕР XP COINS TICKETS комментарий</code>.");
             return;
         }
 
         Long telegramId = resolveBonusTarget(parts[0]);
         Long xp = parsePositiveLong(parts[1]);
         Long coins = parsePositiveLong(parts[2]);
-        if (telegramId == null || xp == null || coins == null) {
+        Long tickets = parsePositiveLong(parts[3]);
+        String comment = parts.length >= 5 ? parts[4] : "За активность";
+        if (telegramId == null || xp == null || coins == null || tickets == null) {
             sendAdminBonusUsersPage(user, session, currentBonusPage(session),
-                    "⚠️ Проверьте номер игрока, XP и монеты. Они должны быть указаны корректно.");
+                    "⚠️ Проверьте номер игрока, XP, монеты и билеты. Они должны быть указаны корректно.");
             return;
         }
 
-        userService.addManualBonus(telegramId, xp, coins);
+        userService.addManualBonus(telegramId, xp, coins, tickets);
         session.reset();
         notifyUser(telegramId,
-                "🎁 Администратор начислил вам бонус.\n\n✨ XP: <b>+" + xp + "</b>\n🪙 Монеты: <b>+" + coins + "</b>");
+                "🎁 Администратор начислил вам бонус.\n\n"
+                        + "✨ XP: <b>+" + xp + "</b>\n"
+                        + "🪙 Монеты: <b>+" + coins + "</b>\n"
+                        + "🎟️ Билеты: <b>+" + tickets + "</b>\n"
+                        + "💬 Основание: <b>" + escape(comment) + "</b>");
         sendText(user.getTelegramId(), "✅ Бонус начислен игроку " + telegramId + ".", mainMenuKeyboard(user));
     }
 
@@ -1876,6 +1885,13 @@ public class GamePlatformBot extends TelegramLongPollingBot {
 
     private String mainMenuText(AppUser user) {
         String role = resolveMenuRole(user, sessionService.get(user.getTelegramId()));
+        if (ROLE_USER.equals(role)) {
+            return "Здравствуйте, " + escape(user.getNickname()) + ".\n\n"
+                    + "Перед вами игровой центр <b>EXPERIENCE GAMING CLUB.</b>\n\n"
+                    + "Здесь вы можете брать задания, накапливать XP, подниматься в рейтинге, приглашать друзей и обменивать монеты на награды.\n\n"
+                    + "Активный режим: <b>Игрок.</b>\n\n"
+                    + "Выберите нужный раздел ниже и продолжайте прогресс.";
+        }
         String title = switch (role) {
             case ROLE_ADMIN -> "🛠️ <b>Административный контур активен</b>";
             case ROLE_MODER -> "🛡️ <b>Пульт модератора</b>";
@@ -1911,16 +1927,11 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         long floor = currentLevelFloor(xp);
         long ceiling = nextLevelCeiling(xp);
         if (ceiling == floor) {
-            return "🏁 Максимальный ранг уже открыт";
+            return "📈 " + xp + "/" + ceiling + " XP";
         }
         long progress = xp - floor;
         long range = ceiling - floor;
-        int filled = (int) Math.max(0, Math.min(8, Math.round((progress * 8.0) / range)));
-        StringBuilder bar = new StringBuilder();
-        for (int i = 0; i < 8; i++) {
-            bar.append(i < filled ? '■' : '□');
-        }
-        return "📈 " + bar + " <b>" + xp + " / " + ceiling + " XP</b>";
+        return "📈 <b>" + progress + "/" + range + " XP</b>";
     }
 
     private long currentLevelFloor(long xp) {
@@ -2062,6 +2073,9 @@ public class GamePlatformBot extends TelegramLongPollingBot {
     }
 
     private String roleWelcomeText(AppUser user, String streakMessage) {
+        if (ROLE_USER.equals(resolveMenuRole(user, sessionService.get(user.getTelegramId())))) {
+            return mainMenuText(user);
+        }
         String title = switch (resolveMenuRole(user, sessionService.get(user.getTelegramId()))) {
             case ROLE_ADMIN -> "🛠️ <b>Административный контур активен</b>";
             case ROLE_MODER -> "🛡️ <b>Контур модерации активен</b>";
