@@ -1,6 +1,5 @@
 package ru.gamebot.platform.bot;
 
-import jakarta.annotation.PostConstruct;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -13,6 +12,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
@@ -89,7 +90,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
     private final SupportService supportService;
     private final KeyboardFactory keyboardFactory;
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     public void registerBot() throws TelegramApiException {
         TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
         botsApi.registerBot(this);
