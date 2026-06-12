@@ -548,8 +548,8 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                 "✨ <b>Профиль собран</b>\n\n"
                         + "🎮 Никнейм: <b>" + escape(updated.getNickname()) + "</b>\n"
                         + "🌍 Регион: <b>" + escape(updated.getCountry()) + "</b>\n"
-                        + "🕹️ Платформы: <b>" + escape(updated.getPlatformsCsv()) + "</b>\n"
-                        + "🎯 Интересы: <b>" + escape(updated.getInterestsCsv()) + "</b>\n"
+                        + "🕹️ Платформы: <b>" + escape(cleanChoiceDisplay(updated.getPlatformsCsv())) + "</b>\n"
+                        + "🎯 Интересы: <b>" + escape(cleanChoiceDisplay(updated.getInterestsCsv())) + "</b>\n"
                         + "🌟 Стартовые достижения: " + escape(achievements) + "\n\n"
                         + "Добро пожаловать в клуб. Теперь можно идти за первым сильным прогрессом.");
     }
@@ -1920,7 +1920,25 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         if (value == null || value.isBlank() || "Не выбраны".equalsIgnoreCase(value)) {
             return fallback;
         }
-        return value;
+        return cleanChoiceDisplay(value);
+    }
+
+    private String cleanChoiceDisplay(String value) {
+        if (value == null || value.isBlank()) {
+            return value;
+        }
+        return value
+                .replace("📱 Android", "Android")
+                .replace("🍎 iPhone", "iPhone")
+                .replace("🖥️ PC", "PC")
+                .replace("🎮 PS5", "PS5")
+                .replace("🕹️ Xbox", "Xbox")
+                .replace("🔫 FPS", "FPS")
+                .replace("🌍 MMO", "MMO")
+                .replace("🧙 RPG", "RPG")
+                .replace("♟️ Стратегии", "Стратегии")
+                .replace("⚽ Спорт", "Спорт")
+                .replace("🎉 Казуальные", "Казуальные");
     }
 
     private String levelProgressLine(AppUser user) {
