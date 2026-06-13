@@ -24,4 +24,8 @@ public interface QuestSubmissionRepository extends JpaRepository<QuestSubmission
     Optional<QuestSubmission> findWithUserAndQuestById(Long id);
 
     long countByStatus(SubmissionStatus status);
+
+    long countByQuest(Quest quest);
+
+    void deleteAllByQuest(Quest quest);
 }

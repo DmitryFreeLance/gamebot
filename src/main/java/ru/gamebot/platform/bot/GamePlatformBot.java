@@ -1298,6 +1298,8 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                     sendAdminBonusUsersPage(user, session, parseInteger(action.substring("bonuspage:".length())), null);
                 } else if (action.startsWith("user:")) {
                     handleAdminUserAction(user, action.substring("user:".length()));
+                } else if (action.startsWith("delete:")) {
+                    deleteQuest(user, parseLong(action.substring("delete:".length())));
                 } else if (action.startsWith("toggle:")) {
                     toggleQuestStatus(user, parseLong(action.substring("toggle:".length())));
                 } else if (action.startsWith("edit-title:")) {
@@ -1343,6 +1345,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                 keyboardFactory.callback("📝 Описание", "admin:edit-description:" + questId),
                 keyboardFactory.callback("✨ Награды", "admin:edit-reward:" + questId),
                 keyboardFactory.callback(quest.isActive() ? "⏸️ Скрыть" : "▶️ Включить", "admin:toggle:" + questId),
+                keyboardFactory.callback("🗑️ Удалить", "admin:delete:" + questId),
                 keyboardFactory.callback("🛠️ Админка", "menu:admin")
         );
         sendText(user.getTelegramId(),
@@ -1672,6 +1675,20 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         questService.save(quest);
         sendText(user.getTelegramId(),
                 "🔁 Статус квеста изменён: теперь он " + (quest.isActive() ? "активен" : "скрыт") + ".",
+                mainMenuKeyboard(user));
+    }
+
+    private void deleteQuest(AppUser user, Long questId) {
+        if (questId == null) {
+            sendText(user.getTelegramId(), "⚠️ Квест для удаления не найден.", mainMenuKeyboard(user));
+            return;
+        }
+        Quest quest = questService.getQuest(questId);
+        long removedSubmissions = questService.deleteQuest(questId);
+        sendText(user.getTelegramId(),
+                "🗑️ Квест удалён.\n\n"
+                        + "🎯 Название: <b>" + escape(quest.getTitle()) + "</b>\n"
+                        + "📎 Удалено связанных заявок: <b>" + removedSubmissions + "</b>",
                 mainMenuKeyboard(user));
     }
 

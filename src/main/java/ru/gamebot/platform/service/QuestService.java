@@ -125,4 +125,15 @@ public class QuestService {
     public long pendingCount() {
         return questSubmissionRepository.countByStatus(SubmissionStatus.PENDING);
     }
+
+    @Transactional
+    public long deleteQuest(Long questId) {
+        Quest quest = getQuest(questId);
+        long submissions = questSubmissionRepository.countByQuest(quest);
+        if (submissions > 0) {
+            questSubmissionRepository.deleteAllByQuest(quest);
+        }
+        questRepository.delete(quest);
+        return submissions;
+    }
 }
