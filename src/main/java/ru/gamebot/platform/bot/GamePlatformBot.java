@@ -155,8 +155,8 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             sendText(user.getTelegramId(),
                     "🎉 Добро пожаловать в <b>" + escape(appProperties.getClubName()) + "</b>!\n\n"
                             + "Чтобы открыть квесты, рейтинг и награды, давайте быстро оформим профиль.\n"
-                            + "<b>ВАЖНО! Ник в боте должен совпадать с ником в игре</b>\n\n"
-                            + "Напишите ваш игровой никнейм.",
+                            + "Напишите ваш игровой никнейм.\n\n"
+                            + "<b>ВАЖНО! Ник в боте должен совпадать с ником в игре</b>",
                     null);
             return;
         }
@@ -215,8 +215,8 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             sendText(user.getTelegramId(),
                     "🎮 Добро пожаловать в <b>" + escape(appProperties.getClubName()) + "</b>!\n\n"
                             + "Здесь вас ждут квесты, XP, рейтинг, награды и реферальная программа.\n"
-                            + "<b>ВАЖНО! Ник в боте должен совпадать с ником в игре</b>\n\n"
-                            + "Начнем с профиля. Напишите ваш игровой никнейм.",
+                            + "Начнем с профиля. Напишите ваш игровой никнейм.\n\n"
+                            + "<b>ВАЖНО! Ник в боте должен совпадать с ником в игре</b>",
                     null);
             return;
         }
@@ -573,11 +573,12 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         sendText(user.getTelegramId(),
                 "👤 <b>Профиль</b>\n\n"
                         + "🎮 <b>" + escape(user.getNickname()) + "</b>\n"
-                        + "⭐ Ранг: <b>" + escape(userService.getLevelName(user.getXp())) + "</b>\n"
+                        + "⭐ Уровень: <b>" + userService.getLevelNumber(user.getXp()) + ". "
+                        + escape(userService.getLevelName(user.getXp())) + "</b>\n"
                         + levelProgressLine(user) + "\n\n"
                         + "🏆 <b>Текущая форма</b>\n"
-                        + "✨ XP: <b>" + user.getXp() + "</b>\n"
                         + "🪙 Монеты: <b>" + user.getCoins() + "</b>\n"
+                        + "💠 Бонус к EXC: <b>+" + userService.getExcBonusPercent(user.getXp()) + "%</b>\n"
                         + "🎟️ Билеты: <b>" + user.getTickets() + "</b>\n"
                         + "🥇 Место в рейтинге: <b>" + rank + "</b>\n"
                         + "✅ Выполнено квестов: <b>" + user.getCompletedQuests() + "</b>\n"
@@ -609,6 +610,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         sendText(user.getTelegramId(),
                 "💰 <b>Баланс</b>\n\n"
                         + "🪙 Монеты клуба: <b>" + user.getCoins() + "</b>\n"
+                        + "💠 Активный бонус к EXC: <b>+" + userService.getExcBonusPercent(user.getXp()) + "%</b>\n"
                         + "🎟️ Билеты сезона: <b>" + user.getTickets() + "</b>\n"
                         + "✨ Общий XP: <b>" + user.getXp() + "</b>\n"
                         + "📈 XP за неделю: <b>" + user.getWeeklyXp() + "</b>\n\n"
@@ -1222,11 +1224,19 @@ public class GamePlatformBot extends TelegramLongPollingBot {
     }
 
     private void handleModerationApprove(CallbackQuery callbackQuery, Long submissionId) {
+        QuestSubmission currentSubmission = questService.getSubmission(submissionId);
+        UserService.RewardGrant rewardGrant = userService.previewReward(
+                currentSubmission.getUser(),
+                currentSubmission.getQuest().getRewardXp(),
+                currentSubmission.getQuest().getRewardCoins(),
+                0
+        );
         QuestSubmission submission = questService.approveSubmission(submissionId);
         notifyUser(submission.getUser().getTelegramId(),
                 "🎉 Ваш отчёт по квесту <b>" + escape(submission.getQuest().getTitle()) + "</b> одобрен!\n\n"
-                        + "✨ Начислено: <b>+" + submission.getQuest().getRewardXp() + " XP</b>\n"
-                        + "🪙 Монеты: <b>+" + submission.getQuest().getRewardCoins() + "</b>");
+                        + "✨ XP: <b>+" + rewardGrant.xp() + "</b>\n"
+                        + "🪙 EXC: <b>+" + rewardGrant.totalExc() + "</b>\n"
+                        + formatExcBonusLine(rewardGrant));
         sendModerationQueue(callbackQuery.getFrom().getId());
         answer(callbackQuery.getId(), "Заявка одобрена");
     }
@@ -1579,13 +1589,14 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             return;
         }
 
-        userService.addManualBonus(telegramId, xp, coins, tickets);
+        UserService.RewardGrant rewardGrant = userService.addManualBonus(telegramId, xp, coins, tickets);
         session.reset();
         notifyUser(telegramId,
                 "🎁 Администратор начислил вам бонус.\n\n"
-                        + "✨ XP: <b>+" + xp + "</b>\n"
-                        + "🪙 Монеты: <b>+" + coins + "</b>\n"
-                        + "🎟️ Билеты: <b>+" + tickets + "</b>\n"
+                        + "✨ XP: <b>+" + rewardGrant.xp() + "</b>\n"
+                        + "🪙 EXC: <b>+" + rewardGrant.totalExc() + "</b>\n"
+                        + formatExcBonusLine(rewardGrant)
+                        + "🎟️ Билеты: <b>+" + rewardGrant.tickets() + "</b>\n"
                         + "💬 Основание: <b>" + escape(comment) + "</b>");
         sendText(user.getTelegramId(), "✅ Бонус начислен игроку " + telegramId + ".", mainMenuKeyboard(user));
     }
@@ -1962,8 +1973,8 @@ public class GamePlatformBot extends TelegramLongPollingBot {
 
     private String levelProgressLine(AppUser user) {
         long xp = user.getXp();
-        long floor = currentLevelFloor(xp);
-        long ceiling = nextLevelCeiling(xp);
+        long floor = userService.currentLevelFloor(xp);
+        long ceiling = userService.nextLevelCeiling(xp);
         if (ceiling == floor) {
             return "📈 " + xp + "/" + ceiling + " XP";
         }
@@ -1972,48 +1983,12 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         return "📈 <b>" + progress + "/" + range + " XP</b>";
     }
 
-    private long currentLevelFloor(long xp) {
-        if (xp >= 6000) {
-            return 6000;
+    private String formatExcBonusLine(UserService.RewardGrant rewardGrant) {
+        if (rewardGrant.bonusExc() <= 0) {
+            return "";
         }
-        if (xp >= 3000) {
-            return 3000;
-        }
-        if (xp >= 1500) {
-            return 1500;
-        }
-        if (xp >= 700) {
-            return 700;
-        }
-        if (xp >= 300) {
-            return 300;
-        }
-        if (xp >= 100) {
-            return 100;
-        }
-        return 0;
-    }
-
-    private long nextLevelCeiling(long xp) {
-        if (xp < 100) {
-            return 100;
-        }
-        if (xp < 300) {
-            return 300;
-        }
-        if (xp < 700) {
-            return 700;
-        }
-        if (xp < 1500) {
-            return 1500;
-        }
-        if (xp < 3000) {
-            return 3000;
-        }
-        if (xp < 6000) {
-            return 6000;
-        }
-        return 6000;
+        return "💠 Бонус уровня: <b>+" + rewardGrant.bonusExc() + " EXC (" + rewardGrant.excBonusPercent()
+                + "%)</b>\n";
     }
 
     private String categoryToken(String category) {

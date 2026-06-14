@@ -19,6 +19,17 @@ import ru.gamebot.platform.domain.repository.AppUserRepository;
 @RequiredArgsConstructor
 public class UserService {
 
+    private static final List<LevelTier> LEVEL_TIERS = List.of(
+            new LevelTier(1, "Новичок", 0, 0),
+            new LevelTier(2, "Игрок", 1_000, 5),
+            new LevelTier(3, "Ветеран", 5_000, 10),
+            new LevelTier(4, "Элита", 15_000, 15),
+            new LevelTier(5, "Легенда", 35_000, 20),
+            new LevelTier(6, "Герой EXPERIENCE", 75_000, 25),
+            new LevelTier(7, "Чемпион EXPERIENCE", 150_000, 30),
+            new LevelTier(8, "Амбассадор EXPERIENCE", 300_000, 50)
+    );
+
     private final AppUserRepository appUserRepository;
 
     @Transactional
@@ -74,26 +85,29 @@ public class UserService {
         return sorted.size() + 1L;
     }
 
+    public int getLevelNumber(long xp) {
+        return resolveLevelTier(xp).number();
+    }
+
     public String getLevelName(long xp) {
-        if (xp >= 6000) {
-            return "Элита";
+        return resolveLevelTier(xp).name();
+    }
+
+    public int getExcBonusPercent(long xp) {
+        return resolveLevelTier(xp).excBonusPercent();
+    }
+
+    public long currentLevelFloor(long xp) {
+        return resolveLevelTier(xp).minXp();
+    }
+
+    public long nextLevelCeiling(long xp) {
+        LevelTier current = resolveLevelTier(xp);
+        int nextIndex = current.number();
+        if (nextIndex >= LEVEL_TIERS.size()) {
+            return current.minXp();
         }
-        if (xp >= 3000) {
-            return "Мастер";
-        }
-        if (xp >= 1500) {
-            return "Ветеран";
-        }
-        if (xp >= 700) {
-            return "Профи";
-        }
-        if (xp >= 300) {
-            return "Опытный";
-        }
-        if (xp >= 100) {
-            return "Игрок";
-        }
-        return "Новичок";
+        return LEVEL_TIERS.get(nextIndex).minXp();
     }
 
     public List<String> getAchievements(AppUser user) {
@@ -103,7 +117,7 @@ public class UserService {
                 user.getCompletedQuests() >= 100 ? "👑 100 заданий" : null,
                 user.getInvitedFriends() >= 1 ? "🤝 Первый реферал" : null,
                 user.getInvitedFriends() >= 10 ? "🚀 10 рефералов" : null,
-                user.getXp() >= 6000 ? "🌟 Легенда клуба" : null
+                user.getXp() >= 35_000 ? "🌟 Легенда клуба" : null
         ).filter(item -> item != null).toList();
     }
 
@@ -178,33 +192,32 @@ public class UserService {
             return;
         }
         referrer.setInvitedFriends(referrer.getInvitedFriends() + 1);
-        referrer.setXp(referrer.getXp() + 30);
-        referrer.setWeeklyXp(referrer.getWeeklyXp() + 30);
-        referrer.setCoins(referrer.getCoins() + 50);
+        addReward(referrer, 30, 50, 0);
         invitedUser.setReferralRewardProcessed(true);
-        appUserRepository.save(referrer);
         appUserRepository.save(invitedUser);
     }
 
     @Transactional
-    public void addReward(AppUser user, long xp, long coins) {
-        addReward(user, xp, coins, 0);
+    public RewardGrant addReward(AppUser user, long xp, long coins) {
+        return addReward(user, xp, coins, 0);
     }
 
     @Transactional
-    public void addReward(AppUser user, long xp, long coins, long tickets) {
+    public RewardGrant addReward(AppUser user, long xp, long coins, long tickets) {
+        RewardGrant rewardGrant = previewReward(user, xp, coins, tickets);
         user.setXp(user.getXp() + xp);
         user.setWeeklyXp(user.getWeeklyXp() + xp);
-        user.setCoins(user.getCoins() + coins);
+        user.setCoins(user.getCoins() + rewardGrant.totalExc());
         user.setTickets(user.getTickets() + tickets);
         appUserRepository.save(user);
+        return rewardGrant;
     }
 
     @Transactional
-    public void addManualBonus(Long telegramId, long xp, long coins, long tickets) {
+    public RewardGrant addManualBonus(Long telegramId, long xp, long coins, long tickets) {
         AppUser user = appUserRepository.findByTelegramId(telegramId)
                 .orElseThrow(() -> new IllegalArgumentException("Игрок с таким Telegram ID не найден."));
-        addReward(user, xp, coins, tickets);
+        return addReward(user, xp, coins, tickets);
     }
 
     @Transactional
@@ -256,6 +269,13 @@ public class UserService {
         }
     }
 
+    public RewardGrant previewReward(AppUser user, long xp, long coins, long tickets) {
+        long resultingXp = user.getXp() + xp;
+        int excBonusPercent = getExcBonusPercent(resultingXp);
+        long bonusExc = coins * excBonusPercent / 100;
+        return new RewardGrant(xp, coins, bonusExc, coins + bonusExc, tickets, excBonusPercent);
+    }
+
     public List<String> csvToList(String value) {
         if (value == null || value.isBlank()) {
             return List.of();
@@ -264,5 +284,23 @@ public class UserService {
                 .map(String::trim)
                 .filter(item -> !item.isBlank())
                 .toList();
+    }
+
+    private LevelTier resolveLevelTier(long xp) {
+        LevelTier current = LEVEL_TIERS.get(0);
+        for (LevelTier tier : LEVEL_TIERS) {
+            if (xp >= tier.minXp()) {
+                current = tier;
+            } else {
+                break;
+            }
+        }
+        return current;
+    }
+
+    public record RewardGrant(long xp, long baseExc, long bonusExc, long totalExc, long tickets, int excBonusPercent) {
+    }
+
+    private record LevelTier(int number, String name, long minXp, int excBonusPercent) {
     }
 }

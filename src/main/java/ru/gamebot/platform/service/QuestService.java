@@ -101,6 +101,7 @@ public class QuestService {
         AppUser user = submission.getUser();
         userService.addReward(user, submission.getQuest().getRewardXp(), submission.getQuest().getRewardCoins());
         user.setCompletedQuests(user.getCompletedQuests() + 1);
+        submission.setUser(user);
         return questSubmissionRepository.save(submission);
     }
 
