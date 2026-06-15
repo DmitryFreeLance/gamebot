@@ -275,8 +275,12 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             return;
         }
         if (data.startsWith("quests:game:")) {
-            sendQuestList(user, decodeGameToken(data.substring("quests:game:".length())));
+            sendQuestCategories(user, decodeGameToken(data.substring("quests:game:".length())));
             answer(callbackQuery.getId(), "Квесты обновлены");
+            return;
+        }
+        if (data.startsWith("quests:list:")) {
+            handleQuestListAction(callbackQuery, user, data.substring("quests:list:".length()));
             return;
         }
         if (data.startsWith("quests:cat:")) {
@@ -666,44 +670,89 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                 keyboardFactory.rowsLayout(rows));
     }
 
-    private void sendQuestList(AppUser user, String gameName) {
+    private void sendQuestCategories(AppUser user, String gameName) {
         if (gameName == null || gameName.isBlank()) {
             sendQuestGames(user);
             return;
         }
 
-        List<Quest> quests = questService.findActiveByGameName(gameName);
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        rows.add(List.of(
+                keyboardFactory.callback("⚡ Быстрые", "quests:list:" + encodeGameToken(gameName) + ":fast"),
+                keyboardFactory.callback("🎯 Средние", "quests:list:" + encodeGameToken(gameName) + ":medium")
+        ));
+        rows.add(List.of(keyboardFactory.callback("🏰 Долгие", "quests:list:" + encodeGameToken(gameName) + ":long")));
+        rows.add(List.of(keyboardFactory.callback("📚 Все квесты", "quests:list:" + encodeGameToken(gameName) + ":all")));
+        rows.add(List.of(
+                keyboardFactory.callback("⬅️ Назад", "menu:quests"),
+                keyboardFactory.callback("🏠 Меню", "menu:main")
+        ));
+
+        sendText(user.getTelegramId(),
+                "🎮 <b>" + escape(gameName) + "</b>\n\n"
+                        + "Выберите нужную категорию и откройте подборку квестов именно по этой игре.",
+                keyboardFactory.rowsLayout(rows));
+    }
+
+    private void sendQuestList(AppUser user, String gameName, String category) {
+        if (gameName == null || gameName.isBlank()) {
+            sendQuestGames(user);
+            return;
+        }
+
+        List<Quest> quests = category == null
+                ? questService.findActiveByGameName(gameName)
+                : questService.findActiveByGameNameAndCategory(gameName, category);
         if (quests.isEmpty()) {
             sendText(user.getTelegramId(),
-                    "📭 Для этой игры пока нет активных квестов. Проверьте позже или выберите другую игру.",
-                    backMenuKeyboard("menu:quests"));
+                    "📭 В этой категории пока нет активных квестов. Проверьте позже или выберите другую подборку.",
+                    backMenuKeyboard("quests:game:" + encodeGameToken(gameName)));
             return;
         }
 
         List<InlineKeyboardButton> buttons = new ArrayList<>();
         for (Quest quest : quests) {
-            buttons.add(keyboardFactory.callback("🎯 " + trim(quest.getTitle(), 32), "quest:view:" + encodeGameToken(gameName) + ":" + quest.getId()));
+            buttons.add(keyboardFactory.callback(
+                    "🎯 " + trim(quest.getTitle(), 32),
+                    "quest:view:" + encodeGameToken(gameName) + ":" + categoryToken(category) + ":" + quest.getId()
+            ));
         }
 
-        String title = "🎮 " + gameName;
+        String title = category == null ? "🎮 " + gameName : "🎮 " + gameName + " • " + category;
         sendText(user.getTelegramId(),
                 "<b>" + escape(title) + "</b>\n\n"
                         + "Ниже собраны активные задания по выбранной игре. Откройте карточку, чтобы увидеть награды и условия прохождения.",
-                verticalWithBackMenu(buttons, "⬅️ Назад", "menu:quests"));
+                verticalWithBackMenu(buttons, "⬅️ Назад", "quests:game:" + encodeGameToken(gameName)));
+    }
+
+    private void handleQuestListAction(CallbackQuery callbackQuery, AppUser user, String payload) {
+        String[] parts = payload.split(":");
+        if (parts.length != 2) {
+            answer(callbackQuery.getId(), "Список квестов недоступен");
+            return;
+        }
+        String gameName = decodeGameToken(parts[0]);
+        String category = categoryFromToken(parts[1]);
+        if (gameName == null) {
+            answer(callbackQuery.getId(), "Список квестов недоступен");
+            return;
+        }
+        sendQuestList(user, gameName, category);
+        answerSilently(callbackQuery.getId());
     }
 
     private void handleQuestView(CallbackQuery callbackQuery, AppUser user, UserSession session, String payload) {
         String[] parts = payload.split(":");
-        if (parts.length != 2) {
+        if (parts.length != 2 && parts.length != 3) {
             answer(callbackQuery.getId(), "Карточка квеста недоступна");
             return;
         }
-        Long questId = parseLong(parts[1]);
+        Long questId = parseLong(parts[parts.length - 1]);
         if (questId == null) {
             answer(callbackQuery.getId(), "Карточка квеста недоступна");
             return;
         }
-        sendQuestCard(user, questId, backDataFromQuestViewToken(parts[0]), "⬅️ Назад", null);
+        sendQuestCard(user, questId, backDataFromQuestViewToken(parts), "⬅️ Назад", null);
         answerSilently(callbackQuery.getId());
     }
 
@@ -1333,9 +1382,11 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             case "stats" -> sendAdminStats(user);
             default -> {
                 if (action.startsWith("quest:")) {
-                    sendAdminQuestEditor(user, parseLong(action.substring("quest:".length())));
+                    handleAdminQuestOpen(user, action.substring("quest:".length()));
                 } else if (action.startsWith("quests:game:")) {
-                    sendAdminQuestListByGame(user, decodeGameToken(action.substring("quests:game:".length())));
+                    sendAdminQuestCategories(user, decodeGameToken(action.substring("quests:game:".length())));
+                } else if (action.startsWith("quests:list:")) {
+                    handleAdminQuestListAction(user, action.substring("quests:list:".length()));
                 } else if (action.startsWith("users:")) {
                     sendAdminUsersPage(user, parseInteger(action.substring("users:".length())));
                 } else if (action.startsWith("bonuspage:")) {
@@ -1390,34 +1441,67 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                 keyboardFactory.rowsLayout(rows));
     }
 
-    private void sendAdminQuestListByGame(AppUser user, String gameName) {
+    private void sendAdminQuestCategories(AppUser user, String gameName) {
         if (gameName == null || gameName.isBlank()) {
             sendAdminQuestList(user);
             return;
         }
 
-        sessionService.get(user.getTelegramId()).getData().put("admin_quest_game", gameName);
-        List<Quest> quests = questService.findAllByGameName(gameName);
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        rows.add(List.of(
+                keyboardFactory.callback("⚡ Быстрые", "admin:quests:list:" + encodeGameToken(gameName) + ":fast"),
+                keyboardFactory.callback("🎯 Средние", "admin:quests:list:" + encodeGameToken(gameName) + ":medium")
+        ));
+        rows.add(List.of(keyboardFactory.callback("🏰 Долгие", "admin:quests:list:" + encodeGameToken(gameName) + ":long")));
+        rows.add(List.of(keyboardFactory.callback("📚 Все квесты", "admin:quests:list:" + encodeGameToken(gameName) + ":all")));
+        rows.add(List.of(
+                keyboardFactory.callback("⬅️ Назад", "admin:edit"),
+                keyboardFactory.callback("🏠 Меню", "menu:admin")
+        ));
+
+        sendText(user.getTelegramId(),
+                "🎮 <b>" + escape(gameName) + "</b>\n\n"
+                        + "Выберите категорию, чтобы открыть нужную группу квестов по этой игре.",
+                keyboardFactory.rowsLayout(rows));
+    }
+
+    private void sendAdminQuestListByGame(AppUser user, String gameName, String category) {
+        if (gameName == null || gameName.isBlank()) {
+            sendAdminQuestList(user);
+            return;
+        }
+
+        List<Quest> quests = category == null
+                ? questService.findAllByGameName(gameName)
+                : questService.findAllByGameNameAndCategory(gameName, category);
         if (quests.isEmpty()) {
             sendText(user.getTelegramId(),
-                    "🗂️ <b>Управление квестами</b>\n\nДля этой игры квестов пока нет.",
-                    backMenuKeyboard("admin:edit"));
+                    "🗂️ <b>Управление квестами</b>\n\nВ этой категории пока нет квестов.",
+                    backMenuKeyboard("admin:quests:game:" + encodeGameToken(gameName)));
             return;
         }
 
         List<InlineKeyboardButton> buttons = new ArrayList<>();
         for (Quest quest : quests) {
-            buttons.add(keyboardFactory.callback("✏️ " + trim(quest.getTitle(), 30), "admin:quest:" + quest.getId()));
+            buttons.add(keyboardFactory.callback(
+                    "✏️ " + trim(quest.getTitle(), 30),
+                    "admin:quest:" + encodeGameToken(gameName) + ":" + categoryToken(category) + ":" + quest.getId()
+            ));
         }
         sendText(user.getTelegramId(),
                 "🎮 <b>" + escape(gameName) + "</b>\n\n"
+                        + (category == null ? "" : "📚 Категория: <b>" + escape(category) + "</b>\n\n")
                         + "Откройте карточку нужного квеста, чтобы обновить текст, награды или статус публикации.",
-                verticalWithBackMenu(buttons, "⬅️ Назад", "admin:edit"));
+                verticalWithBackMenu(buttons, "⬅️ Назад", "admin:quests:game:" + encodeGameToken(gameName)));
     }
 
     private void sendAdminQuestEditor(AppUser user, Long questId) {
+        sendAdminQuestEditor(user, questId, "admin:edit");
+    }
+
+    private void sendAdminQuestEditor(AppUser user, Long questId, String backData) {
         Quest quest = questService.getQuest(questId);
-        String backData = "admin:quests:game:" + encodeGameToken(quest.getGameName());
+        sessionService.get(user.getTelegramId()).getData().put("admin_quest_back_data", backData);
         List<List<InlineKeyboardButton>> rows = List.of(
                 List.of(
                         keyboardFactory.callback("✏️ Название", "admin:edit-title:" + questId),
@@ -1761,7 +1845,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         questService.save(quest);
         sendText(user.getTelegramId(),
                 "🔁 Статус квеста изменён: теперь он " + (quest.isActive() ? "активен" : "скрыт") + ".",
-                backMenuKeyboard("admin:quests:game:" + encodeGameToken(quest.getGameName())));
+                backMenuKeyboard(currentAdminQuestBackData(user, quest)));
     }
 
     private void deleteQuest(AppUser user, Long questId) {
@@ -1770,12 +1854,13 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             return;
         }
         Quest quest = questService.getQuest(questId);
+        String backData = currentAdminQuestBackData(user, quest);
         long removedSubmissions = questService.deleteQuest(questId);
         sendText(user.getTelegramId(),
                 "🗑️ Квест удалён.\n\n"
                         + "🎯 Название: <b>" + escape(quest.getTitle()) + "</b>\n"
                         + "📎 Удалено связанных заявок: <b>" + removedSubmissions + "</b>",
-                backMenuKeyboard("admin:quests:game:" + encodeGameToken(quest.getGameName())));
+                backMenuKeyboard(backData));
     }
 
     private void notifyModeratorsAboutSubmission(Long submissionId) {
@@ -2070,12 +2155,41 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         return sessionService.get(user.getTelegramId()).getData().getOrDefault("quest_back_data", "menu:quests");
     }
 
-    private String backDataFromQuestViewToken(String token) {
+    private String backDataFromQuestViewToken(String[] parts) {
+        if (parts.length == 3) {
+            String gameName = decodeGameToken(parts[0]);
+            String category = categoryFromToken(parts[1]);
+            if (gameName != null) {
+                return "quests:list:" + parts[0] + ":" + categoryToken(category);
+            }
+        }
+        String token = parts[0];
         if (token == null || token.isBlank() || "all".equals(token) || "fast".equals(token)
                 || "medium".equals(token) || "long".equals(token)) {
             return "menu:quests";
         }
         return "quests:game:" + token;
+    }
+
+    private String categoryToken(String category) {
+        if (category == null) {
+            return "all";
+        }
+        return switch (category) {
+            case "Быстрые" -> "fast";
+            case "Средние" -> "medium";
+            case "Долгие" -> "long";
+            default -> "all";
+        };
+    }
+
+    private String categoryFromToken(String token) {
+        return switch (token) {
+            case "fast" -> "Быстрые";
+            case "medium" -> "Средние";
+            case "long" -> "Долгие";
+            default -> null;
+        };
     }
 
     private String encodeGameToken(String gameName) {
@@ -2094,6 +2208,40 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         } catch (IllegalArgumentException exception) {
             return null;
         }
+    }
+
+    private void handleAdminQuestListAction(AppUser user, String payload) {
+        String[] parts = payload.split(":");
+        if (parts.length != 2) {
+            sendText(user.getTelegramId(), "⚠️ Список квестов недоступен.", backMenuKeyboard("admin:edit"));
+            return;
+        }
+        String gameName = decodeGameToken(parts[0]);
+        String category = categoryFromToken(parts[1]);
+        sendAdminQuestListByGame(user, gameName, category);
+    }
+
+    private void handleAdminQuestOpen(AppUser user, String payload) {
+        String[] parts = payload.split(":");
+        if (parts.length == 1) {
+            sendAdminQuestEditor(user, parseLong(parts[0]));
+            return;
+        }
+        if (parts.length != 3) {
+            sendText(user.getTelegramId(), "⚠️ Карточка квеста недоступна.", backMenuKeyboard("admin:edit"));
+            return;
+        }
+        Long questId = parseLong(parts[2]);
+        if (questId == null) {
+            sendText(user.getTelegramId(), "⚠️ Карточка квеста недоступна.", backMenuKeyboard("admin:edit"));
+            return;
+        }
+        sendAdminQuestEditor(user, questId, "admin:quests:list:" + parts[0] + ":" + parts[1]);
+    }
+
+    private String currentAdminQuestBackData(AppUser user, Quest quest) {
+        return sessionService.get(user.getTelegramId()).getData()
+                .getOrDefault("admin_quest_back_data", "admin:quests:game:" + encodeGameToken(quest.getGameName()));
     }
 
     private boolean handleRoleSwitchCommand(AppUser user, UserSession session, String text) {

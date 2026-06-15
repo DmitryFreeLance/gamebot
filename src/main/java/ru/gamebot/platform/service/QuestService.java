@@ -47,6 +47,12 @@ public class QuestService {
         return questRepository.findAllByActiveTrueAndCategoryIgnoreCaseOrderByCreatedAtDesc(category);
     }
 
+    public List<Quest> findActiveByGameNameAndCategory(String gameName, String category) {
+        return findActiveByGameName(gameName).stream()
+                .filter(quest -> sameCategory(quest.getCategory(), category))
+                .toList();
+    }
+
     public List<Quest> findActiveByGameName(String gameName) {
         return findActiveQuests().stream()
                 .filter(quest -> sameGame(quest.getGameName(), gameName))
@@ -58,6 +64,12 @@ public class QuestService {
         return questRepository.findAll().stream()
                 .filter(quest -> sameGame(quest.getGameName(), gameName))
                 .sorted(Comparator.comparing(Quest::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    public List<Quest> findAllByGameNameAndCategory(String gameName, String category) {
+        return findAllByGameName(gameName).stream()
+                .filter(quest -> sameCategory(quest.getCategory(), category))
                 .toList();
     }
 
@@ -172,6 +184,13 @@ public class QuestService {
     }
 
     private boolean sameGame(String left, String right) {
+        if (left == null || right == null) {
+            return false;
+        }
+        return left.trim().equalsIgnoreCase(right.trim());
+    }
+
+    private boolean sameCategory(String left, String right) {
         if (left == null || right == null) {
             return false;
         }
