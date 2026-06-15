@@ -1,6 +1,7 @@
 package ru.gamebot.platform.service;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,8 +25,40 @@ public class QuestService {
         return questRepository.findAllByActiveTrueOrderByCreatedAtDesc();
     }
 
+    public List<String> findActiveGameNames() {
+        return findActiveQuests().stream()
+                .map(Quest::getGameName)
+                .filter(name -> name != null && !name.isBlank())
+                .distinct()
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
+    }
+
+    public List<String> findAllGameNames() {
+        return questRepository.findAll().stream()
+                .map(Quest::getGameName)
+                .filter(name -> name != null && !name.isBlank())
+                .distinct()
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
+    }
+
     public List<Quest> findByCategory(String category) {
         return questRepository.findAllByActiveTrueAndCategoryIgnoreCaseOrderByCreatedAtDesc(category);
+    }
+
+    public List<Quest> findActiveByGameName(String gameName) {
+        return findActiveQuests().stream()
+                .filter(quest -> sameGame(quest.getGameName(), gameName))
+                .sorted(Comparator.comparing(Quest::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    public List<Quest> findAllByGameName(String gameName) {
+        return questRepository.findAll().stream()
+                .filter(quest -> sameGame(quest.getGameName(), gameName))
+                .sorted(Comparator.comparing(Quest::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
     }
 
     public List<Quest> findAll() {
@@ -136,5 +169,12 @@ public class QuestService {
         }
         questRepository.delete(quest);
         return submissions;
+    }
+
+    private boolean sameGame(String left, String right) {
+        if (left == null || right == null) {
+            return false;
+        }
+        return left.trim().equalsIgnoreCase(right.trim());
     }
 }
