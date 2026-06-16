@@ -2119,7 +2119,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         editRegistrationSelectionMessage(
                 callbackQuery,
                 interestQuestionText(selected),
-                selectionKeyboard(INTEREST_OPTIONS, selected, "reg:interest:", true, true, false)
+                selectionKeyboard(INTEREST_OPTIONS, selected, "reg:interest:", true, false, false)
         );
     }
 
