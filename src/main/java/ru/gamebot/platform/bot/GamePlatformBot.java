@@ -503,7 +503,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             case QUEST_CREATE_GAME -> {
                 session.getData().put("game", text.trim());
                 session.setState(SessionState.QUEST_CREATE_CATEGORY);
-                sendText(user.getTelegramId(), "📚 Укажите категорию: Быстрые, Средние или Долгие.", cancelKeyboard());
+                sendText(user.getTelegramId(), "📚 Укажите категорию: Легкие, Средние или Сложные.", cancelKeyboard());
             }
             case QUEST_CREATE_CATEGORY -> {
                 session.getData().put("category", text.trim());
@@ -713,18 +713,18 @@ public class GamePlatformBot extends TelegramLongPollingBot {
     private void sendQuestCategories(AppUser user) {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(
-                keyboardFactory.callback("⚡ Быстрые", "quests:cat:Быстрые"),
+                keyboardFactory.callback("⚡ Легкие", "quests:cat:Легкие"),
                 keyboardFactory.callback("🎯 Средние", "quests:cat:Средние")
         ));
         rows.add(List.of(
-                keyboardFactory.callback("🏰 Долгие", "quests:cat:Долгие")
+                keyboardFactory.callback("🏰 Сложные", "quests:cat:Сложные")
         ));
         rows.add(List.of(keyboardFactory.callback("📂 Мои квесты", "menu:myquests")));
         rows.add(List.of(keyboardFactory.callback("📚 Все квесты", "quests:cat:all")));
         rows.add(List.of(keyboardFactory.callback("🏠 Меню", "menu:main")));
         sendText(user.getTelegramId(),
                 "🗺️ <b>Квесты</b>\n\n"
-                        + "Здесь собраны быстрые старты, средние челленджи и длинные марафоны.\n"
+                        + "Здесь собраны легкие старты, средние челленджи и сложные марафоны.\n"
                         + "Откройте подборку или сразу перейдите к своим активным заданиям.",
                 keyboardFactory.rowsLayout(rows));
     }
@@ -737,10 +737,10 @@ public class GamePlatformBot extends TelegramLongPollingBot {
 
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(
-                keyboardFactory.callback("⚡ Быстрые", "quests:list:" + encodeGameToken(gameName) + ":fast"),
+                keyboardFactory.callback("⚡ Легкие", "quests:list:" + encodeGameToken(gameName) + ":fast"),
                 keyboardFactory.callback("🎯 Средние", "quests:list:" + encodeGameToken(gameName) + ":medium")
         ));
-        rows.add(List.of(keyboardFactory.callback("🏰 Долгие", "quests:list:" + encodeGameToken(gameName) + ":long")));
+        rows.add(List.of(keyboardFactory.callback("🏰 Сложные", "quests:list:" + encodeGameToken(gameName) + ":long")));
         rows.add(List.of(keyboardFactory.callback("📚 Все квесты", "quests:list:" + encodeGameToken(gameName) + ":all")));
         rows.add(List.of(
                 keyboardFactory.callback("⬅️ Назад", "menu:quests"),
@@ -1508,10 +1508,10 @@ public class GamePlatformBot extends TelegramLongPollingBot {
 
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         rows.add(List.of(
-                keyboardFactory.callback("⚡ Быстрые", "admin:quests:list:" + encodeGameToken(gameName) + ":fast"),
+                keyboardFactory.callback("⚡ Легкие", "admin:quests:list:" + encodeGameToken(gameName) + ":fast"),
                 keyboardFactory.callback("🎯 Средние", "admin:quests:list:" + encodeGameToken(gameName) + ":medium")
         ));
-        rows.add(List.of(keyboardFactory.callback("🏰 Долгие", "admin:quests:list:" + encodeGameToken(gameName) + ":long")));
+        rows.add(List.of(keyboardFactory.callback("🏰 Сложные", "admin:quests:list:" + encodeGameToken(gameName) + ":long")));
         rows.add(List.of(keyboardFactory.callback("📚 Все квесты", "admin:quests:list:" + encodeGameToken(gameName) + ":all")));
         rows.add(List.of(
                 keyboardFactory.callback("⬅️ Назад", "admin:edit"),
@@ -2235,18 +2235,18 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             return "all";
         }
         return switch (category) {
-            case "Быстрые" -> "fast";
+            case "Легкие", "Быстрые" -> "fast";
             case "Средние" -> "medium";
-            case "Долгие" -> "long";
+            case "Сложные", "Долгие" -> "long";
             default -> "all";
         };
     }
 
     private String categoryFromToken(String token) {
         return switch (token) {
-            case "fast" -> "Быстрые";
+            case "fast" -> "Легкие";
             case "medium" -> "Средние";
-            case "long" -> "Долгие";
+            case "long" -> "Сложные";
             default -> null;
         };
     }
