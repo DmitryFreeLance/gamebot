@@ -489,6 +489,7 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                 sendPlatformQuestion(user, session);
             }
             case BONUS_INPUT -> handleBonusInput(user, session, text);
+            case DEBIT_INPUT -> handleDebitInput(user, session, text);
             case BROADCAST_MESSAGE -> handleBroadcast(user, session, text);
             case QUEST_CREATE_TITLE -> {
                 session.getData().put("title", text.trim());
@@ -1431,6 +1432,11 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                 session.setState(SessionState.BONUS_INPUT);
                 sendAdminBonusUsersPage(user, session, 0, null);
             }
+            case "debit" -> {
+                session.reset();
+                session.setState(SessionState.DEBIT_INPUT);
+                sendAdminDebitUsersPage(user, session, 0, null);
+            }
             case "broadcast" -> {
                 session.reset();
                 session.setState(SessionState.BROADCAST_MESSAGE);
@@ -1451,6 +1457,9 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                 } else if (action.startsWith("bonuspage:")) {
                     session.setState(SessionState.BONUS_INPUT);
                     sendAdminBonusUsersPage(user, session, parseInteger(action.substring("bonuspage:".length())), null);
+                } else if (action.startsWith("debitpage:")) {
+                    session.setState(SessionState.DEBIT_INPUT);
+                    sendAdminDebitUsersPage(user, session, parseInteger(action.substring("debitpage:".length())), null);
                 } else if (action.startsWith("user:")) {
                     handleAdminUserAction(user, action.substring("user:".length()));
                 } else if (action.startsWith("delete:")) {
@@ -1788,6 +1797,61 @@ public class GamePlatformBot extends TelegramLongPollingBot {
         sendText(admin.getTelegramId(), builder.toString(), keyboardFactory.rowsLayout(rows));
     }
 
+    private void sendAdminDebitUsersPage(AppUser admin, UserSession session, Integer requestedPage, String notice) {
+        List<AppUser> users = userService.allUsersSorted();
+        if (users.isEmpty()) {
+            sendText(admin.getTelegramId(),
+                    "➖ <b>Списание баланса</b>\n\nВ базе пока нет пользователей для списания.",
+                    backMenuKeyboard("menu:main"));
+            return;
+        }
+
+        int totalPages = Math.max(1, (int) Math.ceil(users.size() / (double) BONUS_USERS_PAGE_SIZE));
+        int page = requestedPage == null ? 0 : Math.max(0, Math.min(requestedPage, totalPages - 1));
+        int from = page * BONUS_USERS_PAGE_SIZE;
+        int to = Math.min(users.size(), from + BONUS_USERS_PAGE_SIZE);
+        List<AppUser> pageItems = users.subList(from, to);
+        session.getData().put("debit_page", Integer.toString(page));
+
+        StringBuilder builder = new StringBuilder();
+        if (notice != null && !notice.isBlank()) {
+            builder.append(notice).append("\n\n");
+        }
+        builder.append("➖ <b>Списание баланса</b>\n\n")
+                .append("Выберите игрока по номеру из списка ниже и отправьте данные одним сообщением.\n")
+                .append("Формат: <code>НОМЕР XP EXC TICKETS комментарий</code>\n")
+                .append("Пример: <code>").append(from + 1).append(" 50 100 1 Корректировка баланса</code>\n\n")
+                .append("Страница <b>").append(page + 1).append(" / ").append(totalPages).append("</b>\n\n");
+
+        for (int i = 0; i < pageItems.size(); i++) {
+            AppUser target = pageItems.get(i);
+            int number = from + i + 1;
+            builder.append(number).append(". <b>").append(escape(displayUserName(target))).append("</b>\n")
+                    .append("🏷️ ").append(escape(displayTag(target))).append(" • ")
+                    .append("ID: <code>").append(target.getTelegramId()).append("</code>\n")
+                    .append("🪙 EXC: <b>").append(target.getCoins()).append("</b> • ")
+                    .append("🎟️ ").append(target.getTickets()).append(" • ")
+                    .append("✨ ").append(target.getXp()).append(" XP\n\n");
+        }
+
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        List<InlineKeyboardButton> pagination = new ArrayList<>();
+        if (page > 0) {
+            pagination.add(keyboardFactory.callback("⬅️ Назад", "admin:debitpage:" + (page - 1)));
+        }
+        if (page < totalPages - 1) {
+            pagination.add(keyboardFactory.callback("➡️ Далее", "admin:debitpage:" + (page + 1)));
+        }
+        if (!pagination.isEmpty()) {
+            rows.add(pagination);
+        }
+        rows.add(List.of(
+                keyboardFactory.callback("🛠️ Админка", "menu:admin"),
+                keyboardFactory.callback("🏠 Меню", "menu:main")
+        ));
+        sendText(admin.getTelegramId(), builder.toString(), keyboardFactory.rowsLayout(rows));
+    }
+
     private void handleBonusInput(AppUser user, UserSession session, String text) {
         String[] parts = text.trim().split("\\s+", 5);
         if (parts.length < 4) {
@@ -1817,6 +1881,41 @@ public class GamePlatformBot extends TelegramLongPollingBot {
                         + "🎟️ Билеты: <b>+" + rewardGrant.tickets() + "</b>\n"
                         + "💬 Основание: <b>" + escape(comment) + "</b>");
         sendText(user.getTelegramId(), "✅ Бонус начислен игроку " + telegramId + ".", mainMenuKeyboard(user));
+    }
+
+    private void handleDebitInput(AppUser user, UserSession session, String text) {
+        String[] parts = text.trim().split("\\s+", 5);
+        if (parts.length < 4) {
+            sendAdminDebitUsersPage(user, session, currentDebitPage(session),
+                    "⚠️ Формат неверный. Используйте: <code>НОМЕР XP EXC TICKETS комментарий</code>.");
+            return;
+        }
+
+        Long telegramId = resolveBonusTarget(parts[0]);
+        Long xp = parsePositiveLong(parts[1]);
+        Long exc = parsePositiveLong(parts[2]);
+        Long tickets = parsePositiveLong(parts[3]);
+        String comment = parts.length >= 5 ? parts[4] : "Корректировка баланса";
+        if (telegramId == null || xp == null || exc == null || tickets == null) {
+            sendAdminDebitUsersPage(user, session, currentDebitPage(session),
+                    "⚠️ Проверьте номер игрока, XP, EXC и билеты. Они должны быть указаны корректно.");
+            return;
+        }
+
+        try {
+            UserService.BalanceDebit debit = userService.debitManualBalance(telegramId, xp, exc, tickets);
+            session.reset();
+            notifyUser(telegramId,
+                    "➖ Администратор выполнил списание баланса.\n\n"
+                            + "✨ XP: <b>-" + debit.xp() + "</b>\n"
+                            + "🪙 EXC: <b>-" + debit.exc() + "</b>\n"
+                            + "🎟️ Билеты: <b>-" + debit.tickets() + "</b>\n"
+                            + "💬 Основание: <b>" + escape(comment) + "</b>");
+            sendText(user.getTelegramId(), "✅ Списание применено для игрока " + telegramId + ".", mainMenuKeyboard(user));
+        } catch (IllegalArgumentException exception) {
+            sendAdminDebitUsersPage(user, session, currentDebitPage(session),
+                    "⚠️ " + escape(exception.getMessage()));
+        }
     }
 
     private void handleBroadcast(AppUser user, UserSession session, String text) {
@@ -2015,8 +2114,9 @@ public class GamePlatformBot extends TelegramLongPollingBot {
             ));
             rows.add(List.of(
                     keyboardFactory.callback("🎁 Бонус", "admin:bonus"),
-                    keyboardFactory.callback("📣 Рассылка", "admin:broadcast")
+                    keyboardFactory.callback("➖ Списание", "admin:debit")
             ));
+            rows.add(List.of(keyboardFactory.callback("📣 Рассылка", "admin:broadcast")));
             return keyboardFactory.rowsLayout(rows);
         }
 
@@ -2506,6 +2606,10 @@ public class GamePlatformBot extends TelegramLongPollingBot {
 
     private Integer currentBonusPage(UserSession session) {
         return parseInteger(session.getData().getOrDefault("bonus_page", "0"));
+    }
+
+    private Integer currentDebitPage(UserSession session) {
+        return parseInteger(session.getData().getOrDefault("debit_page", "0"));
     }
 
     private Long resolveBonusTarget(String token) {

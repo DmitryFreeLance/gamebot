@@ -240,6 +240,29 @@ public class UserService {
     }
 
     @Transactional
+    public BalanceDebit debitManualBalance(Long telegramId, long xp, long coins, long tickets) {
+        AppUser user = appUserRepository.findByTelegramId(telegramId)
+                .orElseThrow(() -> new IllegalArgumentException("Игрок с таким Telegram ID не найден."));
+
+        if (user.getXp() < xp) {
+            throw new IllegalArgumentException("Недостаточно XP для списания.");
+        }
+        if (user.getCoins() < coins) {
+            throw new IllegalArgumentException("Недостаточно EXC для списания.");
+        }
+        if (user.getTickets() < tickets) {
+            throw new IllegalArgumentException("Недостаточно билетов для списания.");
+        }
+
+        user.setXp(user.getXp() - xp);
+        user.setWeeklyXp(Math.max(0, user.getWeeklyXp() - xp));
+        user.setCoins(user.getCoins() - coins);
+        user.setTickets(user.getTickets() - tickets);
+        appUserRepository.save(user);
+        return new BalanceDebit(xp, coins, tickets);
+    }
+
+    @Transactional
     public void resetWeeklyXp() {
         List<AppUser> users = appUserRepository.findAll();
         users.forEach(user -> user.setWeeklyXp(0));
@@ -352,6 +375,9 @@ public class UserService {
     }
 
     public record RewardGrant(long xp, long baseExc, long bonusExc, long totalExc, long tickets, int excBonusPercent) {
+    }
+
+    public record BalanceDebit(long xp, long exc, long tickets) {
     }
 
     private record LevelTier(int number, String name, long minXp, int excBonusPercent) {
