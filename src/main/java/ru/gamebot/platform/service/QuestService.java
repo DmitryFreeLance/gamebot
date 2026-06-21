@@ -44,7 +44,9 @@ public class QuestService {
     }
 
     public List<Quest> findByCategory(String category) {
-        return questRepository.findAllByActiveTrueAndCategoryIgnoreCaseOrderByCreatedAtDesc(category);
+        return findActiveQuests().stream()
+                .filter(quest -> sameCategory(quest.getCategory(), category))
+                .toList();
     }
 
     public List<Quest> findActiveByGameNameAndCategory(String gameName, String category) {
@@ -194,6 +196,16 @@ public class QuestService {
         if (left == null || right == null) {
             return false;
         }
-        return left.trim().equalsIgnoreCase(right.trim());
+        return normalizeCategory(left).equalsIgnoreCase(normalizeCategory(right));
+    }
+
+    private String normalizeCategory(String value) {
+        String normalized = value == null ? "" : value.trim();
+        return switch (normalized.toLowerCase()) {
+            case "быстрые", "легкие" -> "Легкие";
+            case "долгие", "сложные" -> "Сложные";
+            case "средние" -> "Средние";
+            default -> normalized;
+        };
     }
 }

@@ -19,6 +19,8 @@ public class SchemaPatchInitializer implements CommandLineRunner {
         apply("UPDATE app_users SET tickets = 0 WHERE tickets IS NULL");
         apply("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS profile_completed BOOLEAN DEFAULT FALSE");
         apply("UPDATE app_users SET profile_completed = registration_completed WHERE profile_completed IS NULL OR profile_completed = FALSE");
+        apply("UPDATE quests SET category = 'Легкие' WHERE category = 'Быстрые'");
+        apply("UPDATE quests SET category = 'Сложные' WHERE category = 'Долгие'");
 
         apply("ALTER TABLE reward_items ADD COLUMN IF NOT EXISTS photo_file_id VARCHAR(255)");
     }
